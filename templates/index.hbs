@@ -1,0 +1,11 @@
+{{> head }}
+  <p><a href="/entry">new entry</a></p>
+  <ul>
+    {{#each entries}}
+      <li>
+        <a href="/entries/{{ this.id }}">{{#if this.title}}{{ this.title }}{{else}}<no title>{{/if}}</a>
+        ({{this.updated_at}})
+      </li>
+    {{/each}}
+  </ul>
+{{> foot}}

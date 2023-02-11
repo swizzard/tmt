@@ -1,0 +1,8 @@
+{{> head}}
+  <form id="entry">
+    {{> entry-form title=entry.title url=entry.url notes=entry.notes}}
+    <div>
+      <button form="entry" type="submit" formaction="/entries" formmethod="post">Save</button>
+    </div>
+  </form>
+{{> foot}}

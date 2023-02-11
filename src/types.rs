@@ -5,13 +5,12 @@ use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use url::Url;
 
 pub(crate) type Conn = Arc<Mutex<Connection>>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct Entry {
-    pub url: Url,
+    pub url: String,
     pub title: String,
     pub notes: String,
 }
@@ -19,7 +18,7 @@ pub(crate) struct Entry {
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct DbEntry {
     pub id: usize,
-    pub url: Url,
+    pub url: String,
     pub title: String,
     pub notes: String,
     pub created_at: DateTime<Utc>,

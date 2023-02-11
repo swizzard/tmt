@@ -1,0 +1,7 @@
+{{> head }}
+  <form id="entry">
+    {{> entry-form title=entry.title url=entry.url notes=entry.notes}}
+    <button form="entry" type="submit" formaction="/entries/{{entry.id}}" formmethod="post">Save</button>
+    <button form="entry" type="submit" formaction="/entries/{{entry.id}}/delete" formmethod="post" formnovalidate="true">Delete</button>
+  </form>
+{{> foot}}

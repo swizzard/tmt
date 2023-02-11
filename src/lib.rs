@@ -8,7 +8,7 @@ use axum::{
     extract,
     extract::State,
     response::{ErrorResponse, IntoResponse, Redirect, Result},
-    routing::get,
+    routing::{get, post},
     Router, Server,
 };
 use axum_macros::debug_handler;
@@ -34,7 +34,7 @@ impl AppState {
     fn new(conn: Connection) -> anyhow::Result<Self> {
         let conn = Arc::new(Mutex::new(conn));
         let mut hbs = Handlebars::new();
-        hbs.register_templates_directory(".hbs", "../templates")?;
+        hbs.register_templates_directory(".hbs", "./templates")?;
         let addr = local_ip()?;
         Ok(Self {
             addr,
@@ -168,15 +168,15 @@ async fn update_entry(
 
 #[tokio::main]
 pub async fn main() {
-    let conn = make_table(db_conn().unwrap()).unwrap();
+    let conn = db_conn().expect("db connection");
+    let conn = make_table(conn).expect("make table");
     let state = AppState::new(conn).unwrap();
     let app = Router::new()
         .route("/", get(get_index))
-        .route("/entry", get(new_entry).post(create_entry))
-        .route(
-            "/entries/:entry_id",
-            get(get_entry).delete(delete_entry).put(update_entry),
-        )
+        .route("/entry", get(new_entry))
+        .route("/entries", post(create_entry))
+        .route("/entries/:entry_id", get(get_entry).post(update_entry))
+        .route("/entries/:entry_id/delete", post(delete_entry))
         .with_state(state);
     Server::bind(&"0.0.0.0:9999".parse().unwrap())
         .serve(app.into_make_service())
