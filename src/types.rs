@@ -1,12 +1,25 @@
 use anyhow::Result;
 use chrono::prelude::*;
+use dirs::home_dir;
 use rusqlite::{Connection, Row};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+pub(crate) fn folder_path() -> PathBuf {
+    let mut home = home_dir().unwrap();
+    home.push(".tmt");
+    home
+}
+
 pub(crate) type Conn = Arc<Mutex<Connection>>;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct Addr {
+    pub addr: IpAddr,
+}
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct Entry {

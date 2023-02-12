@@ -10,6 +10,7 @@ anyhow = "1.0.69"
 axum = { version = "0.6.4", features = ["form", "tokio", "macros"] }
 axum-template = { version = "0.14.0", features = ["handlebars"] }
 chrono = { version = "0.4.23", features = ["serde"] }
+dirs = "4.0.0"
 handlebars = { version = "4.3.6", features = ["dir_source"] }
 http = "0.2.8"
 hyper = { version = "0.14.24", features = ["full"] }

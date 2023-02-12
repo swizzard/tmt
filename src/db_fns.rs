@@ -3,7 +3,9 @@ use anyhow::{anyhow, Result};
 use rusqlite::{named_params, Connection};
 
 pub(crate) fn db_conn() -> Result<Connection> {
-    Connection::open("./db.db3").map_err(|_| anyhow!("Error opening database"))
+    let mut pth = folder_path();
+    pth.push("db.db3");
+    Connection::open(pth).map_err(|_| anyhow!("Error opening database"))
 }
 
 pub(crate) fn make_table(conn: Connection) -> Result<Connection> {

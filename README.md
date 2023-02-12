@@ -20,7 +20,12 @@ you're literally me.
 I wrote and ran this on a System76 Galago Pro 2 laptop running Ubuntu 22.04. It
 _should_ probably work on other platforms but I make no promises.
 
-`git clone https://github.com/swizzard/tmt && cd tmt && cargo run` should do you.
+### Installation etc
+
+- `git clone https://github.com/swizzard/tmt`
+- `mkdir ~/.tmt && cd ~/.tmt && ln -s <where you cloned tmt>/templates`
+- `cargo run` (or `cargo install --path .`)
+
 It's currently hardcoded to run on port `9999`, so visit `http://localhost:9999`
 and you should be off to the races.
 
@@ -32,3 +37,5 @@ and you should be off to the races.
       which is fine for Literally Just Me but might be worth making configurable
       so anyone else can use it
 - [ ] Packaging it up as a crate and/or executable(s)
+  - [ ] The templates are all pretty small so I'm sure I could embed them in the
+        binary, somehow.

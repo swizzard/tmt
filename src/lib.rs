@@ -32,8 +32,10 @@ struct AppState {
 impl AppState {
     fn new(conn: Connection) -> anyhow::Result<Self> {
         let conn = Arc::new(Mutex::new(conn));
+        let mut pth = folder_path();
+        pth.push("templates");
         let mut hbs = Handlebars::new();
-        hbs.register_templates_directory(".hbs", "./templates")?;
+        hbs.register_templates_directory(".hbs", pth.to_str().unwrap())?;
         let addr = local_ip()?;
         Ok(Self {
             addr,
@@ -136,8 +138,11 @@ async fn create_entry(
     }
 }
 
-async fn new_entry(State(engine): State<AppEngine>) -> Result<impl IntoResponse> {
-    Ok(RenderHtml("new_entry", engine, ()))
+async fn new_entry(
+    State(engine): State<AppEngine>,
+    State(addr): State<IpAddr>,
+) -> Result<impl IntoResponse> {
+    Ok(RenderHtml("new_entry", engine, Addr { addr }))
 }
 
 async fn update_entry(
