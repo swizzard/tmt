@@ -11,7 +11,6 @@ use axum::{
     routing::{get, post},
     Router, Server,
 };
-use axum_macros::debug_handler;
 use axum_template::{engine::Engine, RenderHtml};
 use handlebars::Handlebars;
 use http::StatusCode;
@@ -83,7 +82,6 @@ fn db_400(e: anyhow::Error) -> ErrorResponse {
     }
 }
 
-#[debug_handler(state = AppState)]
 async fn get_index(
     State(engine): State<AppEngine>,
     State(conn): State<Conn>,
@@ -99,7 +97,6 @@ async fn get_index(
     }
 }
 
-#[debug_handler(state = AppState)]
 async fn get_entry(
     State(engine): State<AppEngine>,
     State(conn): State<Conn>,
@@ -112,7 +109,6 @@ async fn get_entry(
     }
 }
 
-#[debug_handler(state = AppState)]
 async fn delete_entry(
     State(conn): State<Conn>,
     extract::Path(entry_id): extract::Path<usize>,
@@ -130,7 +126,6 @@ async fn delete_entry(
     }
 }
 
-#[debug_handler(state = AppState)]
 async fn create_entry(
     State(conn): State<Conn>,
     extract::Form(data): extract::Form<Entry>,
@@ -141,12 +136,10 @@ async fn create_entry(
     }
 }
 
-#[debug_handler(state = AppState)]
 async fn new_entry(State(engine): State<AppEngine>) -> Result<impl IntoResponse> {
     Ok(RenderHtml("new_entry", engine, ()))
 }
 
-#[debug_handler(state = AppState)]
 async fn update_entry(
     State(conn): State<Conn>,
     extract::Path(entry_id): extract::Path<usize>,

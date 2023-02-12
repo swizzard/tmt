@@ -1040,7 +1040,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "axum-macros",
  "axum-template",
  "chrono",
  "handlebars",
@@ -1050,7 +1049,6 @@ dependencies = [
  "rusqlite",
  "serde",
  "tokio",
- "url",
 ]
 
 [[package]]
@@ -1220,7 +1218,6 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
- "serde",
 ]
 
 [[package]]

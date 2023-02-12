@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.69"
 axum = { version = "0.6.4", features = ["form", "tokio", "macros"] }
-axum-macros = "0.3.2"
 axum-template = { version = "0.14.0", features = ["handlebars"] }
 chrono = { version = "0.4.23", features = ["serde"] }
 handlebars = { version = "4.3.6", features = ["dir_source"] }
@@ -18,4 +17,3 @@ local-ip-address = "0.5.1"
 rusqlite = { version = "0.28.0", features = ["chrono", "url"] }
 serde = { version = "1.0.152", features = ["derive"] }
 tokio = { version = "1.25.0", features = ["full"] }
-url = { version = "2.3.1", features = ["serde"] }
