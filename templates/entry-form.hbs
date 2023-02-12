@@ -5,6 +5,9 @@
 <div>
   <label for="url">URL</label>
   <input type="text" name="url" id="url" value="{{url}}" />
+  {{#if url}}
+    <div><a href="{{url}}" target="_blank">Visit</a><div>
+  {{/if}}
 </div>
 <div>
   <label for="notes">Notes</label>
