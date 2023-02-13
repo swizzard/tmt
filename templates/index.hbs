@@ -1,11 +1,15 @@
 {{> head }}
   <p><a href="/entry">new entry</a></p>
+  <form id="entries">
   <ul>
-    {{#each entries}}
-      <li>
-        <a href="/entries/{{ this.id }}">{{#if this.title}}{{ this.title }}{{else}}<no title>{{/if}}</a>
-        ({{this.updated_at}})
-      </li>
-    {{/each}}
-  </ul>
+      {{#each entries}}
+        <li>
+          <a href="/entries/{{ this.id }}">{{#if this.title}}{{ this.title }}{{else}}<no title>{{/if}}</a>
+          <span>({{this.updated_at}})</span>
+          {{#if this.url}}<span><a href="{{this.url}}" target="_blank">Visit</a></span>{{/if}}
+          <button form="entries" type="submit" formaction="/entries/{{this.id}}/delete" formmethod="post">Delete</button>
+        </li>
+      {{/each}}
+    </ul>
+  </form>
 {{> foot}}
