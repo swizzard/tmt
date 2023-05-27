@@ -32,7 +32,7 @@ pub(crate) fn make_table(conn: Connection) -> Result<Connection> {
 
 pub(crate) async fn get_all_entries(conn: Conn) -> Result<Vec<DbEntry>> {
     let c = conn.lock().await;
-    let mut stmt = c.prepare("SELECT * FROM entries")?;
+    let mut stmt = c.prepare("SELECT * FROM entries ORDER BY created_at DESC")?;
     let entries = stmt
         .query_and_then((), |row| DbEntry::from_row(row))?
         .collect::<Result<Vec<DbEntry>>>()?;
