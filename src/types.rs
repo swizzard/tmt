@@ -1,20 +1,16 @@
 use anyhow::Result;
 use chrono::prelude::*;
 use dirs::home_dir;
-use rusqlite::{Connection, Row};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio_postgres::Row;
 
 pub(crate) fn folder_path() -> PathBuf {
     let mut home = home_dir().unwrap();
     home.push(".tmt");
     home
 }
-
-pub(crate) type Conn = Arc<Mutex<Connection>>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct Addr {
@@ -30,7 +26,7 @@ pub(crate) struct Entry {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct DbEntry {
-    pub id: usize,
+    pub id: u32,
     pub url: String,
     pub title: String,
     pub notes: String,
@@ -51,13 +47,13 @@ pub(crate) struct ManyEntries {
 }
 
 impl DbEntry {
-    pub(crate) fn from_row(row: &Row<'_>) -> Result<Self> {
-        let id = row.get("id")?;
-        let url = row.get("url")?;
-        let title = row.get("title")?;
-        let notes = row.get("notes")?;
-        let created_at = row.get("created_at")?;
-        let updated_at = row.get("updated_at")?;
+    pub(crate) fn from_row(row: &Row) -> Result<Self> {
+        let id = row.get::<&str, u32>("id");
+        let url = row.get::<&str, String>("url");
+        let title = row.get::<&str, String>("title");
+        let notes = row.get::<&str, String>("notes");
+        let created_at = row.get::<&str, DateTime<Utc>>("created_at");
+        let updated_at = row.get::<&str, DateTime<Utc>>("updated_at");
         Ok(Self {
             id,
             url,

@@ -1,16 +1,25 @@
 use crate::types::*;
-use anyhow::{anyhow, Result};
-use rusqlite::{named_params, Connection};
+use anyhow::Result;
+use tokio_postgres::{Client, NoTls};
 
-pub(crate) fn db_conn() -> Result<Connection> {
-    let mut pth = folder_path();
-    pth.push("db.db3");
-    Connection::open(pth).map_err(|_| anyhow!("Error opening database"))
+pub(crate) async fn db_conn() -> Result<Client> {
+    let (client, connection) = tokio_postgres::connect(
+        "host=localhost user=swizzard port=5433 database=swizzard_toomanytabs",
+        NoTls,
+    )
+    .await?;
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+    Ok(client)
 }
 
-pub(crate) fn make_table(conn: Connection) -> Result<Connection> {
-    conn.execute(
-        r#"
+pub(crate) async fn make_table(client: &Client) -> Result<()> {
+    client
+        .execute(
+            r#"
          CREATE TABLE IF NOT EXISTS entries (
              id INTEGER PRIMARY KEY,
              url TEXT DEFAULT "" NOT NULL,
@@ -25,48 +34,54 @@ pub(crate) fn make_table(conn: Connection) -> Result<Connection> {
             UPDATE entries SET updated_at = (datetime('now', 'utc')) WHERE id = NEW.id;
          END;
          "#,
-        (),
-    )?;
-    Ok(conn)
+            &[],
+        )
+        .await?;
+    Ok(())
 }
 
-pub(crate) async fn get_all_entries(conn: Conn) -> Result<Vec<DbEntry>> {
-    let c = conn.lock().await;
-    let mut stmt = c.prepare("SELECT * FROM entries ORDER BY created_at DESC")?;
-    let entries = stmt
-        .query_and_then((), |row| DbEntry::from_row(row))?
+pub(crate) async fn get_all_entries(client: &Client) -> Result<Vec<DbEntry>> {
+    let entries = client
+        .query("SELECT * FROM entries ORDER BY created_at DESC", &[])
+        .await?
+        .iter()
+        .map(|row| DbEntry::from_row(row))
         .collect::<Result<Vec<DbEntry>>>()?;
     Ok(entries)
 }
 
-pub(crate) async fn get_entry(conn: Conn, entry_id: usize) -> Result<DbEntry> {
-    let c = conn.lock().await;
-    let entry = c.query_row_and_then("SELECT * FROM entries WHERE id = ?", (entry_id,), |row| {
-        DbEntry::from_row(row)
-    })?;
-    Ok(entry)
+pub(crate) async fn get_entry(client: &Client, entry_id: u32) -> Result<Option<DbEntry>> {
+    client
+        .query_opt("SELECT * FROM entries WHERE id = ?", &[&entry_id])
+        .await?
+        .map(|row| DbEntry::from_row(&row))
+        .transpose()
 }
 
-pub(crate) async fn delete_entry(conn: Conn, entry_id: usize) -> Result<usize> {
-    let c = conn.lock().await;
-    let num_affected = c.execute("DELETE FROM entries WHERE id = ?", (entry_id,))?;
+pub(crate) async fn delete_entry(client: &Client, entry_id: u32) -> Result<u64> {
+    let num_affected = client
+        .execute("DELETE FROM entries WHERE id = ?", &[&entry_id])
+        .await?;
     Ok(num_affected)
 }
 
-pub(crate) async fn create_entry(conn: Conn, data: Entry) -> Result<usize> {
-    let c = conn.lock().await;
-    let mut stmt =
-        c.prepare("INSERT INTO entries (url, title, notes) VALUES (:url, :title, :notes)")?;
-    let new_id = stmt
-        .insert(named_params! {":url": data.url, ":title": data.title, ":notes": data.notes})?
-        .try_into()?;
+pub(crate) async fn create_entry(client: &Client, data: Entry) -> Result<u32> {
+    let new_id = client
+        .query_one(
+            "INSERT INTO entries (url, title, notes) VALUES ($1, $2, $3) RETURNING id",
+            &[&data.url, &data.title, &data.notes],
+        )
+        .await?
+        .get(0);
     Ok(new_id)
 }
 
-pub(crate) async fn update_entry(conn: Conn, entry_id: usize, data: Entry) -> Result<usize> {
-    let c = conn.lock().await;
-    let mut stmt =
-        c.prepare("UPDATE entries SET url = :url, title = :title, notes = :notes WHERE id = :id")?;
-    let num_affected = stmt.execute(named_params! {":url": data.url, ":title": data.title, ":notes": data.notes, ":id": entry_id})?;
+pub(crate) async fn update_entry(client: &Client, entry_id: u32, data: Entry) -> Result<u64> {
+    let stmt = client
+        .prepare("UPDATE entries SET url = $2, title = $3, notes = $4 WHERE id = $1")
+        .await?;
+    let num_affected = client
+        .execute(&stmt, &[&entry_id, &data.url, &data.title, &data.notes])
+        .await?;
     Ok(num_affected)
 }

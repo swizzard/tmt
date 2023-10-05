@@ -15,23 +15,20 @@ use axum_template::{engine::Engine, RenderHtml};
 use handlebars::Handlebars;
 use http::StatusCode;
 use local_ip_address::local_ip;
-use rusqlite::Connection;
 use std::net::IpAddr;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 type AppEngine = Engine<Handlebars<'static>>;
 
 #[derive(Clone, Debug, extract::FromRef)]
 struct AppState {
     addr: IpAddr,
-    conn: Conn,
+    client: Arc<tokio_postgres::Client>,
     engine: AppEngine,
 }
 
 impl AppState {
-    fn new(conn: Connection) -> anyhow::Result<Self> {
-        let conn = Arc::new(Mutex::new(conn));
+    fn new(client: tokio_postgres::Client) -> anyhow::Result<Self> {
         let mut pth = folder_path();
         pth.push("templates");
         let mut hbs = Handlebars::new();
@@ -39,81 +36,59 @@ impl AppState {
         let addr = local_ip()?;
         Ok(Self {
             addr,
-            conn,
+            client: Arc::new(client),
             engine: Engine::from(hbs),
         })
     }
 }
 
-fn entries_url(id: usize) -> String {
+fn entries_url(id: u32) -> String {
     format!("/entries/{id}")
 }
 
-fn db_404(e: anyhow::Error) -> ErrorResponse {
-    match e.downcast_ref() {
-        Some(re) => match re {
-            rusqlite::Error::QueryReturnedNoRows => {
-                (StatusCode::NOT_FOUND, "entry not found").into()
-            }
-            e => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("internal server error: {e}"),
-            )
-                .into(),
-        },
-        None => (StatusCode::INTERNAL_SERVER_ERROR, "internal server error").into(),
-    }
+fn db_404() -> ErrorResponse {
+    (StatusCode::NOT_FOUND, "entry not found").into()
 }
 
 fn db_400(e: anyhow::Error) -> ErrorResponse {
-    match e.downcast_ref() {
-        Some(
-            err @ rusqlite::Error::InvalidParameterName(_)
-            | err @ rusqlite::Error::ToSqlConversionFailure(_),
-        ) => (StatusCode::BAD_REQUEST, format!("invalid request: {err}")).into(),
-        Some(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("internal server error: {err}"),
-        )
-            .into(),
-        None => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("internal server error: {e}"),
-        )
-            .into(),
-    }
+    (StatusCode::BAD_REQUEST, format!("invalid request: {e}")).into()
+}
+
+fn db_500(e: anyhow::Error) -> ErrorResponse {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        format!("internal server error: {e})"),
+    )
+        .into()
 }
 
 async fn get_index(
     State(engine): State<AppEngine>,
-    State(conn): State<Conn>,
+    State(conn): State<&tokio_postgres::Client>,
     State(addr): State<IpAddr>,
 ) -> Result<impl IntoResponse> {
     match db_fns::get_all_entries(conn).await {
         Ok(entries) => Ok(RenderHtml("index", engine, ManyEntries { entries, addr })),
-        Err(e) => Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("internal server error: {e}"),
-        )
-            .into()),
+        Err(e) => Err(db_500(e)),
     }
 }
 
 async fn get_entry(
     State(engine): State<AppEngine>,
-    State(conn): State<Conn>,
+    State(conn): State<&tokio_postgres::Client>,
     State(addr): State<IpAddr>,
-    extract::Path(entry_id): extract::Path<usize>,
+    extract::Path(entry_id): extract::Path<u32>,
 ) -> Result<impl IntoResponse> {
     match db_fns::get_entry(conn, entry_id).await {
-        Ok(entry) => Ok(RenderHtml("entry", engine, SingleEntry { entry, addr })),
-        Err(e) => Err(db_404(e)),
+        Ok(Some(entry)) => Ok(RenderHtml("entry", engine, SingleEntry { entry, addr })),
+        Ok(_) => Err(db_404()),
+        Err(e) => Err(db_500(e)),
     }
 }
 
 async fn delete_entry(
-    State(conn): State<Conn>,
-    extract::Path(entry_id): extract::Path<usize>,
+    State(conn): State<&tokio_postgres::Client>,
+    extract::Path(entry_id): extract::Path<u32>,
 ) -> Result<impl IntoResponse> {
     match db_fns::delete_entry(conn, entry_id).await {
         Ok(num_affected) if num_affected == 1 => Ok(Redirect::to("/")),
@@ -129,7 +104,7 @@ async fn delete_entry(
 }
 
 async fn create_entry(
-    State(conn): State<Conn>,
+    State(conn): State<&tokio_postgres::Client>,
     extract::Form(data): extract::Form<Entry>,
 ) -> Result<impl IntoResponse> {
     match db_fns::create_entry(conn, data).await {
@@ -146,8 +121,8 @@ async fn new_entry(
 }
 
 async fn update_entry(
-    State(conn): State<Conn>,
-    extract::Path(entry_id): extract::Path<usize>,
+    State(conn): State<&tokio_postgres::Client>,
+    extract::Path(entry_id): extract::Path<u32>,
     extract::Form(data): extract::Form<Entry>,
 ) -> Result<impl IntoResponse> {
     match db_fns::update_entry(conn, entry_id, data).await {
@@ -166,8 +141,8 @@ async fn update_entry(
 
 #[tokio::main]
 pub async fn main() {
-    let conn = db_conn().expect("db connection");
-    let conn = make_table(conn).expect("make table");
+    let conn = db_conn().await.expect("db connection");
+    make_table(&conn).await.expect("make table");
     let state = AppState::new(conn).unwrap();
     let app = Router::new()
         .route("/", get(get_index))
