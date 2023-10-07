@@ -51,7 +51,7 @@ impl AppState {
     }
 }
 
-fn entries_url(id: u32) -> String {
+fn entries_url(id: i32) -> String {
     format!("/entries/{id}")
 }
 
@@ -86,7 +86,7 @@ async fn get_entry(
     State(engine): State<AppEngine>,
     State(conn): State<Client>,
     State(addr): State<IpAddr>,
-    extract::Path(entry_id): extract::Path<u32>,
+    extract::Path(entry_id): extract::Path<i32>,
 ) -> Result<impl IntoResponse> {
     match db_fns::get_entry(&conn.0, entry_id).await {
         Ok(Some(entry)) => Ok(RenderHtml("entry", engine, SingleEntry { entry, addr })),
@@ -97,7 +97,7 @@ async fn get_entry(
 
 async fn delete_entry(
     State(conn): State<Client>,
-    extract::Path(entry_id): extract::Path<u32>,
+    extract::Path(entry_id): extract::Path<i32>,
 ) -> Result<impl IntoResponse> {
     match db_fns::delete_entry(&conn.0, entry_id).await {
         Ok(num_affected) if num_affected == 1 => Ok(Redirect::to("/")),
@@ -131,7 +131,7 @@ async fn new_entry(
 
 async fn update_entry(
     State(conn): State<Client>,
-    extract::Path(entry_id): extract::Path<u32>,
+    extract::Path(entry_id): extract::Path<i32>,
     extract::Form(data): extract::Form<Entry>,
 ) -> Result<impl IntoResponse> {
     match db_fns::update_entry(&conn.0, entry_id, data).await {

@@ -3,17 +3,25 @@ use anyhow::Result;
 use tokio_postgres::{Client, NoTls};
 
 pub(crate) async fn db_conn() -> Result<Client> {
-    let (client, connection) = tokio_postgres::connect(
-        "host=localhost user=swizzard port=5433 database=swizzard_toomanytabs",
+    match tokio_postgres::connect(
+        "user=swizzard password=postgres dbname=swizzard_toomanytabs host=localhost port=5433",
         NoTls,
     )
-    .await?;
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
+    .await
+    {
+        Ok((client, connection)) => {
+            tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("connection error: {}", e);
+                }
+            });
+            Ok(client)
         }
-    });
-    Ok(client)
+        Err(e) => {
+            eprintln!("db error: {}", e);
+            Err(e.into())
+        }
+    }
 }
 
 pub(crate) async fn make_table(client: &Client) -> Result<()> {
@@ -21,18 +29,47 @@ pub(crate) async fn make_table(client: &Client) -> Result<()> {
         .execute(
             r#"
          CREATE TABLE IF NOT EXISTS entries (
-             id INTEGER PRIMARY KEY,
-             url TEXT DEFAULT "" NOT NULL,
-             title TEXT DEFAULT "" NOT NULL,
-             notes TEXT DEFAULT "" NOT NULL,
-             created_at TEXT DEFAULT (datetime('now', 'utc')),
-             updated_at TEXT DEFAULT (datetime('now', 'utc'))
+             id SERIAL PRIMARY KEY,
+             url TEXT NOT NULL DEFAULT '',
+             title TEXT NOT NULL DEFAULT '',
+             notes TEXT NOT NULL DEFAULT '',
+             created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('gmt', localtimestamp),
+             updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('gmt', localtimestamp)
          );
-         CREATE TRIGGER IF NOT EXISTS update_updated_trigger
-         AFTER INSERT ON entries
-         BEGIN
-            UPDATE entries SET updated_at = (datetime('now', 'utc')) WHERE id = NEW.id;
-         END;
+         "#,
+            &[],
+        )
+        .await?;
+
+    client
+        .execute(
+            r#"
+         CREATE OR REPLACE FUNCTION uut() RETURNS TRIGGER AS $$
+            
+             BEGIN
+                 NEW.updated_at = timezone('gmt', localtimestamp);
+                 RETURN NEW;
+             END;
+         $$ LANGUAGE plpgsql;
+         "#,
+            &[],
+        )
+        .await?;
+    client
+        .execute(
+            r#"
+         DROP TRIGGER IF EXISTS update_updated_trigger ON entries;
+         "#,
+            &[],
+        )
+        .await?;
+    client
+        .execute(
+            r#"
+         CREATE TRIGGER update_updated_trigger
+             AFTER INSERT ON entries
+             FOR EACH ROW
+             EXECUTE PROCEDURE uut();
          "#,
             &[],
         )
@@ -50,22 +87,22 @@ pub(crate) async fn get_all_entries(client: &Client) -> Result<Vec<DbEntry>> {
     Ok(entries)
 }
 
-pub(crate) async fn get_entry(client: &Client, entry_id: u32) -> Result<Option<DbEntry>> {
+pub(crate) async fn get_entry(client: &Client, entry_id: i32) -> Result<Option<DbEntry>> {
     client
-        .query_opt("SELECT * FROM entries WHERE id = ?", &[&entry_id])
+        .query_opt("SELECT * FROM entries WHERE id = $1", &[&entry_id])
         .await?
         .map(|row| DbEntry::from_row(&row))
         .transpose()
 }
 
-pub(crate) async fn delete_entry(client: &Client, entry_id: u32) -> Result<u64> {
+pub(crate) async fn delete_entry(client: &Client, entry_id: i32) -> Result<u64> {
     let num_affected = client
-        .execute("DELETE FROM entries WHERE id = ?", &[&entry_id])
+        .execute("DELETE FROM entries WHERE id = $1", &[&entry_id])
         .await?;
     Ok(num_affected)
 }
 
-pub(crate) async fn create_entry(client: &Client, data: Entry) -> Result<u32> {
+pub(crate) async fn create_entry(client: &Client, data: Entry) -> Result<i32> {
     let new_id = client
         .query_one(
             "INSERT INTO entries (url, title, notes) VALUES ($1, $2, $3) RETURNING id",
@@ -76,12 +113,12 @@ pub(crate) async fn create_entry(client: &Client, data: Entry) -> Result<u32> {
     Ok(new_id)
 }
 
-pub(crate) async fn update_entry(client: &Client, entry_id: u32, data: Entry) -> Result<u64> {
-    let stmt = client
-        .prepare("UPDATE entries SET url = $2, title = $3, notes = $4 WHERE id = $1")
-        .await?;
+pub(crate) async fn update_entry(client: &Client, entry_id: i32, data: Entry) -> Result<u64> {
     let num_affected = client
-        .execute(&stmt, &[&entry_id, &data.url, &data.title, &data.notes])
+        .execute(
+            "UPDATE entries SET url = $2, title = $3, notes = $4 WHERE id = $1",
+            &[&entry_id, &data.url, &data.title, &data.notes],
+        )
         .await?;
     Ok(num_affected)
 }

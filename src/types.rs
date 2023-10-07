@@ -26,7 +26,7 @@ pub(crate) struct Entry {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct DbEntry {
-    pub id: u32,
+    pub id: i32,
     pub url: String,
     pub title: String,
     pub notes: String,
@@ -48,7 +48,7 @@ pub(crate) struct ManyEntries {
 
 impl DbEntry {
     pub(crate) fn from_row(row: &Row) -> Result<Self> {
-        let id = row.get::<&str, u32>("id");
+        let id = row.get::<&str, i32>("id");
         let url = row.get::<&str, String>("url");
         let title = row.get::<&str, String>("title");
         let notes = row.get::<&str, String>("notes");
